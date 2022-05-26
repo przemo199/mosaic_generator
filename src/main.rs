@@ -1,16 +1,18 @@
 mod cli;
-mod config;
 mod image_data;
-mod mosaic;
-mod mosaic_controller;
+mod mosaic_builder;
+mod parallel_mosaic_impl;
+mod serial_mosaic_impl;
+mod slow_parallel_mosaic_impl;
 
-use crate::cli::CliArgs;
+use crate::cli::{AlgorithmType, CliArgs};
 use crate::image_data::ImageData;
-use crate::mosaic::BasicMosaicAlgorithm;
-use crate::mosaic_controller::MosaicBuilder;
+use crate::mosaic_builder::{MosaicBuilder, MosaicFactory};
+use crate::parallel_mosaic_impl::ParallelMosaicImpl;
+use crate::serial_mosaic_impl::SerialMosaicImpl;
+use crate::slow_parallel_mosaic_impl::SlowParallelMosaicImpl;
 
 use clap::Parser;
-use image::ImageFormat;
 use std::path::Path;
 
 fn main() {
@@ -20,30 +22,67 @@ fn main() {
         panic!("Input image does not exist: {}", input_image_path.display());
     }
 
-    let img_data = ImageData::from_path(Path::new(input_image_path));
-    let mosaic_algorithm = BasicMosaicAlgorithm::new(img_data);
-    let mosaic_factory = MosaicBuilder::new(mosaic_algorithm);
+    match cli_args.algorithm_type {
+        AlgorithmType::Serial => run_workflow(
+            &MosaicFactory::new(
+                Path::new(input_image_path),
+                SerialMosaicImpl,
+                cli_args.tile_side_length,
+            ),
+            &cli_args,
+        ),
+        AlgorithmType::Parallel => run_workflow(
+            &MosaicFactory::new(
+                Path::new(input_image_path),
+                ParallelMosaicImpl,
+                cli_args.tile_side_length,
+            ),
+            &cli_args,
+        ),
+        AlgorithmType::SlowParallel => run_workflow(
+            &MosaicFactory::new(
+                Path::new(input_image_path),
+                SlowParallelMosaicImpl,
+                cli_args.tile_side_length,
+            ),
+            &cli_args,
+        ),
+    };
+}
 
-    if cli_args.benchmark {
-        println!("Running benchmark...");
+fn run_workflow(mosaic_factory: &MosaicFactory<impl MosaicBuilder>, cli_args: &CliArgs) {
+    if cli_args.benchmark_runs > 0 {
+        println!("Checking algorithm correctness...");
+        let correctness_results = mosaic_factory.check_correctness();
+        println!("Stage 1 incorrect: {:?}", correctness_results.0);
+        println!("Stage 2 incorrect: {:?}", correctness_results.1);
+        println!("Stage 3 incorrect: {:?}", correctness_results.2);
+        println!("Global average incorrect: {:?}", correctness_results.3);
+        println!("\nRunning benchmark...");
+        let benchmark_results = mosaic_factory.benchmark(cli_args.benchmark_runs);
+        println!("Stage 1: {:?}", benchmark_results.0);
+        println!("Stage 2: {:?}", benchmark_results.1);
+        println!("Stage 3: {:?}", benchmark_results.2);
         println!(
-            "{:?}",
-            mosaic_factory.benchmark(config::BENCHMARK_RUNS as u64)
+            "Total time: {:?}",
+            benchmark_results.0 + benchmark_results.1 + benchmark_results.2
         );
     }
 
     if !cli_args.output_image_path.is_empty() {
-        let extension = Path::new(&cli_args.output_image_path).extension();
-        match extension {
-            Some(ext) => {
-                let extension = ext;
+        match mosaic_factory.generate_and_save_mosaic(&cli_args.output_image_path) {
+            Ok(_) => {
+                println!(
+                    "Successfully generated and saved mosaic at: {}",
+                    cli_args.output_image_path
+                );
             }
-            None => panic!(
-                "Missing extension on output image path: {}",
-                cli_args.output_image_path
-            ),
+            Err(_) => {
+                panic!(
+                    "Failed to generate and save mosaic at: {}",
+                    cli_args.output_image_path
+                );
+            }
         }
-        let output_file_format =
-            ImageFormat::from_extension(Path::new(&cli_args.output_image_path).extension());
     }
 }
