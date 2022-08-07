@@ -8,7 +8,7 @@ use rayon::prelude::*;
 pub struct SlowParallelMosaicImpl;
 
 impl MosaicBuilder for SlowParallelMosaicImpl {
-    fn sum_tile_channels(&self, mosaic_builder: &MosaicFactory<impl MosaicBuilder>) -> Vec<u32> {
+    fn sum_tile_channels(&self, mosaic_builder: &MosaicFactory) -> Vec<u32> {
         let tile_sum: Mutex<Vec<u32>> = Mutex::new(vec![
             0;
             ((mosaic_builder.tiles_x * mosaic_builder.tiles_y)
@@ -47,7 +47,7 @@ impl MosaicBuilder for SlowParallelMosaicImpl {
 
     fn calc_tile_average(
         &self,
-        mosaic_builder: &MosaicFactory<impl MosaicBuilder>,
+        mosaic_builder: &MosaicFactory,
         tile_sum: &[u32],
     ) -> (Vec<u8>, Vec<u8>) {
         let global_sum: Mutex<Vec<u128>> =
@@ -87,11 +87,7 @@ impl MosaicBuilder for SlowParallelMosaicImpl {
         return (tile_average.into_inner().unwrap(), global_average);
     }
 
-    fn create_mosaic(
-        &self,
-        mosaic_builder: &MosaicFactory<impl MosaicBuilder>,
-        tile_average: &[u8],
-    ) -> Vec<u8> {
+    fn create_mosaic(&self, mosaic_builder: &MosaicFactory, tile_average: &[u8]) -> Vec<u8> {
         let mosaic: Mutex<Vec<u8>> = Mutex::new(vec![
             0;
             (mosaic_builder.img_data.width

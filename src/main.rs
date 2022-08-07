@@ -22,35 +22,22 @@ fn main() {
         panic!("Input image does not exist: {}", input_image_path.display());
     }
 
-    match cli_args.algorithm_type {
-        AlgorithmType::Serial => run_workflow(
-            &MosaicFactory::new(
-                Path::new(input_image_path),
-                SerialMosaicImpl,
-                cli_args.tile_side_length,
-            ),
-            &cli_args,
-        ),
-        AlgorithmType::Parallel => run_workflow(
-            &MosaicFactory::new(
-                Path::new(input_image_path),
-                ParallelMosaicImpl,
-                cli_args.tile_side_length,
-            ),
-            &cli_args,
-        ),
-        AlgorithmType::SlowParallel => run_workflow(
-            &MosaicFactory::new(
-                Path::new(input_image_path),
-                SlowParallelMosaicImpl,
-                cli_args.tile_side_length,
-            ),
-            &cli_args,
-        ),
+    let implementation: Box<dyn MosaicBuilder> = match cli_args.algorithm_type {
+        AlgorithmType::Serial => Box::new(SerialMosaicImpl),
+        AlgorithmType::Parallel => Box::new(ParallelMosaicImpl),
+        AlgorithmType::SlowParallel => Box::new(SlowParallelMosaicImpl),
     };
+
+    let mosaic_factory = MosaicFactory::new(
+        Path::new(input_image_path),
+        implementation,
+        cli_args.tile_side_length,
+    );
+
+    run_workflow(&mosaic_factory, &cli_args);
 }
 
-fn run_workflow(mosaic_factory: &MosaicFactory<impl MosaicBuilder>, cli_args: &CliArgs) {
+fn run_workflow(mosaic_factory: &MosaicFactory, cli_args: &CliArgs) {
     if cli_args.benchmark_runs > 0 {
         println!("Checking algorithm correctness...");
         let correctness_results = mosaic_factory.check_correctness();

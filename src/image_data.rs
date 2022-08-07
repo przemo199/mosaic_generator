@@ -59,11 +59,11 @@ pub fn image_channels(img: &DynamicImage) -> u8 {
 }
 
 pub fn load_image<P: AsRef<Path>>(image_path: P) -> DynamicImage {
-    fn _load_image(image_path: &Path) -> Result<DynamicImage, ImageError> {
+    fn local_load_image(image_path: &Path) -> Result<DynamicImage, ImageError> {
         return ImageReader::open(image_path)?.decode();
     }
 
-    let img = _load_image(image_path.as_ref());
+    let img = local_load_image(image_path.as_ref());
     match img {
         Ok(img) => {
             return img;

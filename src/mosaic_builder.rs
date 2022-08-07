@@ -4,34 +4,32 @@ use std::ops::{AddAssign, Div};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-pub trait MosaicBuilder {
+pub trait MosaicBuilder: Sync {
     /// Adds together channels in pixels belonging to the same tile, each channel is summed to a separate value.
-    fn sum_tile_channels(&self, _: &MosaicFactory<impl MosaicBuilder>) -> Vec<u32>;
+    fn sum_tile_channels(&self, _: &MosaicFactory) -> Vec<u32>;
+
     /// Calculates the average of each of the channels in a tile. Also calculates global image average.
-    fn calc_tile_average(
-        &self,
-        _: &MosaicFactory<impl MosaicBuilder>,
-        _: &[u32],
-    ) -> (Vec<u8>, Vec<u8>);
+    fn calc_tile_average(&self, _: &MosaicFactory, _: &[u32]) -> (Vec<u8>, Vec<u8>);
+
     /// Creates a mosaic from the tile averages.
-    fn create_mosaic(&self, _: &MosaicFactory<impl MosaicBuilder>, _: &[u8]) -> Vec<u8>;
+    fn create_mosaic(&self, _: &MosaicFactory, _: &[u8]) -> Vec<u8>;
 }
 
-pub struct MosaicFactory<T: MosaicBuilder> {
+pub struct MosaicFactory {
     pub tile_side_length: u32,
     pub tile_pixels: u32,
     pub tiles_x: u32,
     pub tiles_y: u32,
     pub img_data: ImageData,
-    pub implementation: T,
+    pub mosaic_builder: Box<dyn MosaicBuilder>,
 }
 
-impl<T: MosaicBuilder> MosaicFactory<T> {
+impl MosaicFactory {
     pub fn new<P: AsRef<Path>>(
         input_image_path: P,
-        implementation: T,
+        mosaic_builder: Box<dyn MosaicBuilder>,
         tile_side_length: u32,
-    ) -> MosaicFactory<T> {
+    ) -> MosaicFactory {
         let image_data = ImageData::from_path(input_image_path, tile_side_length);
         return MosaicFactory {
             tile_side_length,
@@ -39,15 +37,15 @@ impl<T: MosaicBuilder> MosaicFactory<T> {
             tiles_x: image_data.width / tile_side_length,
             tiles_y: image_data.height / tile_side_length,
             img_data: image_data,
-            implementation,
+            mosaic_builder,
         };
     }
 
     pub fn generate_mosaic(&self) -> Vec<u8> {
-        let tile_sum = self.implementation.sum_tile_channels(self);
-        let average_results = self.implementation.calc_tile_average(self, &tile_sum);
+        let tile_sum = self.mosaic_builder.sum_tile_channels(self);
+        let average_results = self.mosaic_builder.calc_tile_average(self, &tile_sum);
         println!("Image global average: {:?}", average_results.1);
-        return self.implementation.create_mosaic(self, &average_results.0);
+        return self.mosaic_builder.create_mosaic(self, &average_results.0);
     }
 
     pub fn benchmark(&self, benchmark_runs: u32) -> (Duration, Duration, Duration) {
@@ -57,15 +55,15 @@ impl<T: MosaicBuilder> MosaicFactory<T> {
 
         for _ in 0..benchmark_runs {
             let start = Instant::now();
-            let tile_sum = self.implementation.sum_tile_channels(self);
+            let tile_sum = self.mosaic_builder.sum_tile_channels(self);
             sum_tile_channels_time.add_assign(start.elapsed());
 
             let start = Instant::now();
-            let tile_average = self.implementation.calc_tile_average(self, &tile_sum);
+            let tile_average = self.mosaic_builder.calc_tile_average(self, &tile_sum);
             calc_tile_average_time.add_assign(start.elapsed());
 
             let start = Instant::now();
-            self.implementation.create_mosaic(self, &tile_average.0);
+            self.mosaic_builder.create_mosaic(self, &tile_average.0);
             create_mosaic_time.add_assign(start.elapsed());
         }
 
@@ -106,9 +104,9 @@ impl<T: MosaicBuilder> MosaicFactory<T> {
         let serial_stage1 = SerialMosaicImpl.sum_tile_channels(self);
         let serial_stage2 = SerialMosaicImpl.calc_tile_average(self, &serial_stage1);
         let serial_stage3 = SerialMosaicImpl.create_mosaic(self, &serial_stage2.0);
-        let new_stage1 = self.implementation.sum_tile_channels(self);
-        let new_stage2 = self.implementation.calc_tile_average(self, &serial_stage1);
-        let new_stage3 = self.implementation.create_mosaic(self, &serial_stage2.0);
+        let new_stage1 = self.mosaic_builder.sum_tile_channels(self);
+        let new_stage2 = self.mosaic_builder.calc_tile_average(self, &serial_stage1);
+        let new_stage3 = self.mosaic_builder.create_mosaic(self, &serial_stage2.0);
 
         fn calc_diff<U: PartialEq<W>, W: PartialEq<U>>(vec1: Vec<U>, vec2: Vec<W>) -> usize {
             return vec1.iter().zip(&vec2).filter(|(a, b)| a != b).count();
@@ -121,6 +119,3 @@ impl<T: MosaicBuilder> MosaicFactory<T> {
         return (stage1_diff, stage2_diff, stage3_diff, global_average_diff);
     }
 }
-
-unsafe impl<T: MosaicBuilder> Send for MosaicFactory<T> {}
-unsafe impl<T: MosaicBuilder> Sync for MosaicFactory<T> {}
