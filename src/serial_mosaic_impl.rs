@@ -1,4 +1,4 @@
-use crate::mosaic_builder::MosaicBuilder;
+use crate::mosaic_factory::MosaicBuilder;
 use crate::MosaicFactory;
 
 /// C-like mosaic implementation

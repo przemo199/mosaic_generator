@@ -1,13 +1,13 @@
 mod cli;
 mod image_data;
-mod mosaic_builder;
+mod mosaic_factory;
 mod parallel_mosaic_impl;
 mod serial_mosaic_impl;
 mod slow_parallel_mosaic_impl;
 
 use crate::cli::{AlgorithmType, CliArgs};
 use crate::image_data::ImageData;
-use crate::mosaic_builder::{MosaicBuilder, MosaicFactory};
+use crate::mosaic_factory::{MosaicBuilder, MosaicFactory};
 use crate::parallel_mosaic_impl::ParallelMosaicImpl;
 use crate::serial_mosaic_impl::SerialMosaicImpl;
 use crate::slow_parallel_mosaic_impl::SlowParallelMosaicImpl;
@@ -45,7 +45,7 @@ fn run_workflow(mosaic_factory: &MosaicFactory, cli_args: &CliArgs) {
         println!("Stage 2 incorrect: {:?}", correctness_results.1);
         println!("Stage 3 incorrect: {:?}", correctness_results.2);
         println!("Global average incorrect: {:?}", correctness_results.3);
-        println!("\nRunning benchmark...");
+        println!("\nBenchmarking...");
         let benchmark_results = mosaic_factory.benchmark(cli_args.benchmark_runs);
         println!("Stage 1: {:?}", benchmark_results.0);
         println!("Stage 2: {:?}", benchmark_results.1);
@@ -65,10 +65,7 @@ fn run_workflow(mosaic_factory: &MosaicFactory, cli_args: &CliArgs) {
                 );
             }
             Err(_) => {
-                panic!(
-                    "Failed to generate and save mosaic at: {}",
-                    cli_args.output_image_path
-                );
+                panic!("Failed to save mosaic at: {}", cli_args.output_image_path);
             }
         }
     }

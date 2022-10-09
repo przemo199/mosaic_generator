@@ -1,9 +1,9 @@
-use crate::mosaic_builder::MosaicBuilder;
+use crate::mosaic_factory::MosaicBuilder;
 use crate::MosaicFactory;
 
 use rayon::prelude::*;
 
-/// Parallel mosaic implementation using rayon.
+/// Parallel mosaic implementation using rayon
 pub struct ParallelMosaicImpl;
 
 impl MosaicBuilder for ParallelMosaicImpl {
