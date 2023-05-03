@@ -1,26 +1,30 @@
-use crate::{ImageData, SerialMosaicImpl};
-use image::{ImageFormat, ImageResult};
+use std::fmt::Debug;
 use std::ops::{AddAssign, Div};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-pub trait MosaicBuilder: Sync {
+use image::{ImageFormat, ImageResult};
+
+use crate::{ImageData, SerialMosaic};
+
+pub trait MosaicBuilder: Debug + Sync {
     /// Adds together channels in pixels belonging to the same tile, each channel is summed to a separate value.
-    fn sum_tile_channels(&self, _: &MosaicFactory) -> Vec<u32>;
+    fn sum_tile_channels(&self, mosaic_factory: &MosaicFactory) -> Vec<u32>;
 
     /// Calculates the average of each of the channels in a tile. Also calculates global image average.
-    fn calc_tile_average(&self, _: &MosaicFactory, _: &[u32]) -> (Vec<u8>, Vec<u8>);
+    fn calc_tile_average(&self, mosaic_factory: &MosaicFactory, tile_sum: &[u32]) -> (Vec<u8>, Vec<u8>);
 
     /// Creates a mosaic from the tile averages.
-    fn create_mosaic(&self, _: &MosaicFactory, _: &[u8]) -> Vec<u8>;
+    fn create_mosaic(&self, mosaic_factory: &MosaicFactory, tile_average: &[u8]) -> Vec<u8>;
 }
 
+#[derive(Debug)]
 pub struct MosaicFactory {
     pub tile_side_length: u32,
     pub tile_pixels: u32,
     pub tiles_x: u32,
     pub tiles_y: u32,
-    pub img_data: ImageData,
+    pub image_data: ImageData,
     pub mosaic_builder: Box<dyn MosaicBuilder>,
 }
 
@@ -36,7 +40,7 @@ impl MosaicFactory {
             tile_pixels: tile_side_length * tile_side_length,
             tiles_x: image_data.width / tile_side_length,
             tiles_y: image_data.height / tile_side_length,
-            img_data: image_data,
+            image_data,
             mosaic_builder,
         };
     }
@@ -68,9 +72,9 @@ impl MosaicFactory {
         }
 
         return (
-            sum_tile_channels_time.div(benchmark_runs),
-            calc_tile_average_time.div(benchmark_runs),
-            create_mosaic_time.div(benchmark_runs),
+            sum_tile_channels_time / benchmark_runs,
+            calc_tile_average_time / benchmark_runs,
+            create_mosaic_time / benchmark_runs,
         );
     }
 
@@ -84,14 +88,14 @@ impl MosaicFactory {
                     img,
                     self.tiles_x * self.tile_side_length,
                     self.tiles_y * self.tile_side_length,
-                    self.img_data.color,
+                    self.image_data.color,
                     format,
                 );
             }
             None => panic!(
                 "Missing or incorrect extension in output image path: {}",
                 output_img_path.as_ref().display()
-            ),
+            )
         }
     }
 
@@ -101,21 +105,21 @@ impl MosaicFactory {
     }
 
     pub fn check_correctness(&self) -> (usize, usize, usize, usize) {
-        let serial_stage1 = SerialMosaicImpl.sum_tile_channels(self);
-        let serial_stage2 = SerialMosaicImpl.calc_tile_average(self, &serial_stage1);
-        let serial_stage3 = SerialMosaicImpl.create_mosaic(self, &serial_stage2.0);
-        let new_stage1 = self.mosaic_builder.sum_tile_channels(self);
-        let new_stage2 = self.mosaic_builder.calc_tile_average(self, &serial_stage1);
-        let new_stage3 = self.mosaic_builder.create_mosaic(self, &serial_stage2.0);
+        let serial_stage_1 = SerialMosaic.sum_tile_channels(self);
+        let serial_stage_2 = SerialMosaic.calc_tile_average(self, &serial_stage_1);
+        let serial_stage_3 = SerialMosaic.create_mosaic(self, &serial_stage_2.0);
+        let new_stage_1 = self.mosaic_builder.sum_tile_channels(self);
+        let new_stage_2 = self.mosaic_builder.calc_tile_average(self, &serial_stage_1);
+        let new_stage_3 = self.mosaic_builder.create_mosaic(self, &serial_stage_2.0);
 
-        fn calc_diff<U: PartialEq<W>, W: PartialEq<U>>(vec1: Vec<U>, vec2: Vec<W>) -> usize {
-            return vec1.iter().zip(&vec2).filter(|(a, b)| a != b).count();
+        fn calc_diff<U: PartialEq<W>, W: PartialEq<U>>(vec1: &[U], vec2: &[W]) -> usize {
+            return vec1.iter().zip(vec2).filter(|(a, b)| **a != **b).count();
         }
-        let stage1_diff = calc_diff(new_stage1, serial_stage1);
-        let stage2_diff = calc_diff(new_stage2.0, serial_stage2.0);
-        let global_average_diff = calc_diff(new_stage2.1, serial_stage2.1);
-        let stage3_diff = calc_diff(new_stage3, serial_stage3);
+        let stage_1_diff = calc_diff(&new_stage_1, &serial_stage_1);
+        let stage_2_diff = calc_diff(&new_stage_2.0, &serial_stage_2.0);
+        let global_average_diff = calc_diff(&new_stage_2.1, &serial_stage_2.1);
+        let stage_3_diff = calc_diff(&new_stage_3, &serial_stage_3);
 
-        return (stage1_diff, stage2_diff, stage3_diff, global_average_diff);
+        return (stage_1_diff, stage_2_diff, stage_3_diff, global_average_diff);
     }
 }
