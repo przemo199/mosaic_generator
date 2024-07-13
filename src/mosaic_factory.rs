@@ -126,6 +126,11 @@ impl MosaicFactory {
         let global_average_diff = calc_diff(new_stage_2.1, serial_stage_2.1);
         let stage_3_diff = calc_diff(new_stage_3, serial_stage_3);
 
-        return (stage_1_diff, stage_2_diff, stage_3_diff, global_average_diff);
+        return (
+            stage_1_diff,
+            stage_2_diff,
+            stage_3_diff,
+            global_average_diff,
+        );
     }
 }
