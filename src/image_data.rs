@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use image::{DynamicImage, GenericImageView, ImageError};
 use image::io::Reader as ImageReader;
+use image::{DynamicImage, GenericImageView, ImageError};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ImageData {

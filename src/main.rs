@@ -2,7 +2,7 @@ use std::path::Path;
 
 use clap::Parser;
 
-use crate::args::{AlgorithmType, Args};
+use crate::args::{AlgorithmType, CLIArgs};
 use crate::image_data::ImageData;
 use crate::mosaic_factory::{MosaicBuilder, MosaicFactory};
 use crate::parallel_mosaic::ParallelMosaic;
@@ -17,7 +17,7 @@ mod serial_mosaic;
 mod slow_parallel_mosaic;
 
 fn main() {
-    let cli_args: Args = Args::parse();
+    let cli_args: CLIArgs = CLIArgs::parse();
     let input_image_path = Path::new(&cli_args.input_image_path);
     if !input_image_path.exists() || !input_image_path.is_file() {
         panic!("Input image does not exist: {}", input_image_path.display());
@@ -38,16 +38,19 @@ fn main() {
     run_workflow(&mosaic_factory, &cli_args);
 }
 
-fn run_workflow(mosaic_factory: &MosaicFactory, cli_args: &Args) {
-    if cli_args.benchmark_runs > 0 {
+fn run_workflow(mosaic_factory: &MosaicFactory, cli_args: &CLIArgs) {
+    if let Some(benchmark_runs) = cli_args.benchmark_runs {
         println!("Checking algorithm correctness...");
         let correctness_results = mosaic_factory.check_correctness();
         println!("Stage 1 incorrect values: {:?}", correctness_results.0);
         println!("Stage 2 incorrect values: {:?}", correctness_results.1);
         println!("Stage 3 incorrect values: {:?}", correctness_results.2);
-        println!("Global average incorrect values: {:?}", correctness_results.3);
+        println!(
+            "Global average incorrect values: {:?}",
+            correctness_results.3
+        );
         println!("\nBenchmarking...");
-        let benchmark_results = mosaic_factory.benchmark(cli_args.benchmark_runs);
+        let benchmark_results = mosaic_factory.benchmark(benchmark_runs);
         println!("Stage 1 time: {:?}", benchmark_results.0);
         println!("Stage 2 time: {:?}", benchmark_results.1);
         println!("Stage 3 time: {:?}", benchmark_results.2);
@@ -58,12 +61,10 @@ fn run_workflow(mosaic_factory: &MosaicFactory, cli_args: &Args) {
     }
 
     match &cli_args.output_image_path {
-        Some(path) => {
-            match mosaic_factory.generate_and_save_mosaic(path) {
-                Ok(_) => println!("Successfully generated and saved mosaic at: {}", path),
-                Err(_) => panic!("Failed to save mosaic at: {}", path)
-            }
-        }
-        None => println!("Result discarded, no output path provided")
+        Some(path) => match mosaic_factory.generate_and_save_mosaic(path) {
+            Ok(_) => println!("Successfully generated and saved mosaic at: {}", path),
+            Err(_) => panic!("Failed to save mosaic at: {}", path),
+        },
+        None => println!("Result discarded, no output path provided"),
     }
 }

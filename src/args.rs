@@ -1,13 +1,13 @@
 use clap::{Parser, ValueEnum};
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
-pub struct Args {
+pub struct CLIArgs {
     /// Path to a source image
     pub input_image_path: String,
 
     /// Type of algorithm to use in the image processing
-    #[arg(short, long, value_enum, default_value = "serial")]
+    #[arg(value_enum, default_value = "serial")]
     pub algorithm_type: AlgorithmType,
 
     /// Path to save an output file
@@ -19,11 +19,11 @@ pub struct Args {
     pub tile_side_length: u32,
 
     /// Number of benchmarks iterations to run
-    #[arg(short, long, default_value = "0")]
-    pub benchmark_runs: u32,
+    #[arg(short, long)]
+    pub benchmark_runs: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Debug, ValueEnum)]
 pub enum AlgorithmType {
     Serial,
     Parallel,

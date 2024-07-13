@@ -5,9 +5,9 @@ edition = "2021"
 authors = ["Przemyslaw Kaminski <przemyslaw.m.kaminski@gmail.com>"]
 
 [dependencies]
-clap = { version = "4.2.7", features = ["derive"] }
-image = "0.24.6"
-rayon = "1.7.0"
+clap = { version = "4.5.9", features = ["derive"] }
+image = "0.25.1"
+rayon = "1.10.0"
 
 [profile.release]
 codegen-units = 1
